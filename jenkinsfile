@@ -1,0 +1,37 @@
+//MSbuild test
+pipeline {
+    agent { label 'windows_slave' // Chọn Node slave windows để build
+    } 
+    stages {
+        stage('SCM') { //Checkout git code
+            steps {
+                git 'https://github.com/tvcuongnd/msbuild_project.git'
+            }
+        }
+        
+        stage('build && SonarQube analysis') { // Lưu ý installationName phải đúng với tên khai báo SonarQube, credentialsId chọn token của user đã tạo trên Sonar
+            steps {
+                withSonarQubeEnv(installationName: 'sonarserver',credentialsId: 'Token-example-dotNet') { 
+                    dir("ConsoleApp") {  // code test nội dung bên trong thư mục này nên phải di chuyển vào
+                    bat 'SonarScanner.MSBuild.exe begin /k:example-dotNet' // do đã thêm biến môi trường nên gọi thẳng command
+                    bat "MSBuild.exe /t:Rebuild /restore" // do đã thêm biến môi trường nên gọi thẳng command
+                    bat 'SonarScanner.MSBuild.exe end' // do đã thêm biến môi trường nên gọi thẳng command
+                    }   
+                }
+                // withSonarQubeEnv(installationName: 'sonarserver', credentialsId: 'token1') {
+                //     // Optionally use a Maven environment you've configured already
+                //     // withMaven(maven:'Maven 3.5') {
+                //     //     sh 'mvn clean package sonar:sonar'
+                //     // }
+                //     sh 'mvn clean package sonar:sonar'
+                // }
+            }
+
+        }
+        stage("Quality Gate 1") { // Pass khi ok check, nếu không thì dừng
+            steps {
+                waitForQualityGate abortPipeline: true
+            }
+        }
+    }
+}
